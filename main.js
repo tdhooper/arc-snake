@@ -144,8 +144,8 @@ circles = [{
   "radius":0.20537279631523161
 },{
   "center":{
-    "x":-0.5378719574635445,
-    "y":-0.2133695586361175
+    "x":0.1078719574635445,
+    "y":-0.3133695586361175
   },
   "radius":0.31306736207046515
 },{
@@ -214,27 +214,45 @@ circles.map(function(circle) {
     }
 
     var invert = clockwise ? 1 : -1;
+    var side = 'outer';
 
     var tangentsStart = findTangentCirclePoints(circle, circle1);
-    // debugTangent(debugPositions, tangentsStart.outerAnticlockwise, false);
-    // debugTangent(debugPositions, tangentsStart.outerClockwise, true);
+    // debugTangent(debugPositions, tangentsStart.inner.clockwise, false);
+    // debugTangent(debugPositions, tangentsStart.outer.clockwise, true);
     var circlePointsStartA;
     var circlePointsStartB;
     if (clockwise) {
-      circlePointsStartA = tangentsStart.outerAnticlockwise[0];
-      circlePointsStartB = tangentsStart.outerClockwise[1];
+      circlePointsStartA = tangentsStart[side].anticlockwise[0];
+      circlePointsStartB = tangentsStart[side].clockwise[1];
     } else {
-      circlePointsStartB = tangentsStart.outerAnticlockwise[1];
-      circlePointsStartA = tangentsStart.outerClockwise[0];
+      circlePointsStartA = tangentsStart[side].clockwise[0];
+      circlePointsStartB = tangentsStart[side].anticlockwise[1];
     }
+
+    var kink = Math.abs(diffAngles(
+      tangentsStart.outer.anticlockwise[0].angle,
+      tangentsStart.inner.anticlockwise[0].angle
+    ));
+    if (isNaN(kink)) {
+      kink = 100;
+    }
+    var kinkWeight = rangec(0.9, 1.4, kink);
+
     var a1s = circlePointToAnchor(circlePointsStartA);
     var a2s = circlePointToAnchor(circlePointsStartB);
 
     var dist = a1s.position.distanceTo(a2s.position);
     var r0 = circle.radius / (circle.radius + circle1.radius);
     var r1 = circle1.radius / (circle.radius + circle1.radius);
-    a1s.handle.multiplyScalar(r0 * dist * invert * .5);
-    a2s.handle.multiplyScalar(r1 * dist * invert * .5);
+    var r0far  = r0 * dist * invert * .5;
+    var r1far  = r1 * dist * invert * .5;
+    var r0near  = dist * invert * .5;
+    var r1near  = dist * invert * .5;
+    
+    r0 = lerp(r0far, r0near, kinkWeight);
+    r1 = lerp(r1far, r1near, kinkWeight);
+    a1s.handle.multiplyScalar(r0);
+    a2s.handle.multiplyScalar(r1);
 
     curve.add(createBezier(a1s, a2s));
 
@@ -245,9 +263,9 @@ circles.map(function(circle) {
     var tangentsEnd = findTangentCirclePoints(circle1, circle2);
     var circlePointEnd;
     if (clockwise) {
-      circlePointEnd = tangentsEnd.outerClockwise[0];
+      circlePointEnd = tangentsEnd[side].clockwise[0];
     } else {
-      circlePointEnd = tangentsEnd.outerAnticlockwise[0];
+      circlePointEnd = tangentsEnd[side].anticlockwise[0];
     }
 
     var arcPoints = findArcPoints(circlePointsStartB, circlePointEnd, clockwise);
@@ -403,8 +421,28 @@ function findArcPoints(a, b, clockwise) {
   return points;
 }
 
+function diffAngles(a, b) {
+  return mod(a - b + Math.PI, Math.PI * 2) - Math.PI;
+}
+
 function mod(a, n) {
   return a - Math.floor(a / n) * n;
+}
+
+function rangec(min, max, value) {
+  return clamp(range(min, max, value), 0, 1);
+}
+
+function range(min, max, value) {
+  return (value - min) / (max - min);
+}
+
+function clamp(value, min, max) {
+  return Math.max(Math.min(value, max), min);
+}
+
+function lerp(v0, v1, t) {
+    return v0 * (1 - t) + v1 * t;
 }
 
 function circlePointToAnchor(point) {
@@ -453,54 +491,59 @@ function findTangentCirclePoints(a, b) {
   var localOuterB = Math.atan2(v.x, v.y);
 
   var result = {
-    innerClockwise: [
-      {
-        angle: mod(angleInnerA + localInnerA, Math.PI * 2),
-        circle: a
-      },
-      {
-        angle: mod(angleInnerB + localInnerB, Math.PI * 2),
-        circle: b
-      }
-    ],
-    innerAnticlockwise: [
-      {
-        angle: mod(-angleInnerA + localInnerA, Math.PI * 2),
-        circle: a
-      },
-      {
-        angle: mod(-angleInnerB + localInnerB, Math.PI * 2),
-        circle: b
-      }
-    ],
-    outerClockwise: [
-      {
-        angle: mod(angleOuterA + localOuterA, Math.PI * 2),
-        circle: a
-      },
-      {
-        angle: mod(angleOuterB + localOuterB, Math.PI * 2),
-        circle: b
-      }
-    ],
-    outerAnticlockwise: [
-      {
-        angle: mod(-angleOuterA + localOuterA, Math.PI * 2),
-        circle: a
-      },
-      {
-        angle: mod(-angleOuterB + localOuterB, Math.PI * 2),
-        circle: b
-      }
-    ]
+    inner: {
+      anticlockwise: [
+        {
+          angle: mod(angleInnerA + localInnerA, Math.PI * 2),
+          circle: a
+        },
+        {
+          angle: mod(angleInnerB + localInnerB, Math.PI * 2),
+          circle: b
+        }
+      ],
+      clockwise: [
+        {
+          angle: mod(-angleInnerA + localInnerA, Math.PI * 2),
+          circle: a
+        },
+        {
+          angle: mod(-angleInnerB + localInnerB, Math.PI * 2),
+          circle: b
+        }
+      ]
+    },
+    outer: {
+      clockwise: [
+        {
+          angle: mod(angleOuterA + localOuterA, Math.PI * 2),
+          circle: a
+        },
+        {
+          angle: mod(angleOuterB + localOuterB, Math.PI * 2),
+          circle: b
+        }
+      ],
+      anticlockwise: [
+        {
+          angle: mod(-angleOuterA + localOuterA, Math.PI * 2),
+          circle: a
+        },
+        {
+          angle: mod(-angleOuterB + localOuterB, Math.PI * 2),
+          circle: b
+        }
+      ]
+    }
   };
 
   if (a.radius > b.radius) {
     result = {
-      innerClockwise: result.innerClockwise,
-      innerAnticlockwise: result.innerAnticlockwise,
-      outerClockwise: result.outerAnticlockwise,
-      outerAnticlockwise: result.outerClockwise
+      inner: result.inner,
+      outer: {
+        clockwise: result.outer.anticlockwise,
+        anticlockwise: result.outer.clockwise
+      }
     };
   }
 
