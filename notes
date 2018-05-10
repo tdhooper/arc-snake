@@ -1,0 +1,100 @@
+
+curve
+     0 1 2 ...
+[---]--------------------------[---]
+        <=======
+        snake
+
+snake head position = distance from start of curve
+
+
+circleCurve = new CircleCurve()
+while circleCurve.circles.length < 5
+    circleCurve.circles.push(randomCircle())
+
+snakeHead = 0
+
+loop
+
+    snakeHead -= moveDelta
+
+    // Add circles until we have enough curve to move into
+    while snakeHead < 0
+        oldLength = circleCurve.curve().getLength()
+        circleCurve.circles.push(randomCircle())
+        snakeHead += circleCurve.curve().getLength() - oldLength
+
+    // Remove unused circles
+    snakeTail = snakeHead + snakeLength
+    removeIndex = circleCurve.circleForCurvePosition(snakeTail) + 1
+    circleCurve.circles = circleCurve.circles[:removeIndex]
+
+    curve = circleCurve.curve()
+    points = spacedPointsBetween(curve, snakeHead, snakeTail, 100)
+    render points
+
+
+CircleCurve
+
+    circles
+
+    curves
+        cached
+
+    curvesForCircles
+        curves = []
+        circles.each
+            nextCircle = circles[i + 1]
+            if nextCircle
+                createCurve(circle, nextCircle)
+
+    createCurve(a, b)
+
+    circleForCurvePosition(position)
+        curveLength = 0
+        curvesForCircles = circleCurve.curvesForCircles()
+        curvesForCircles.each
+            curveLength += curvesForCircle.getLength()
+            if curveLength > position:
+                return i
+
+
+Circle
+
+    position
+
+    radius
+
+    clockwise
+
+    homotheticCenters(b)
+
+    tangentCirclePoints(b)
+
+
+CirclePoint
+
+    circle
+
+    angle
+
+    toAnchor
+
+
+Anchor
+
+    position
+
+    handle
+
+
+spacedPointsBetween(curve, start, end, divisions)
+    curveLength = curve.getLength()
+    uStart = start / curveLength
+    uEnd = end / curveLength
+    uLength = uEnd - uStart;
+    points = []
+    for i = 0; i < divisions; i++
+        u = uStart + uLength * (i / divisions)
+        points.push(curve.getPointAt(u))
+    return points
