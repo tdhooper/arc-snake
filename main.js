@@ -1,3 +1,5 @@
+/* jshint esversion: 6 */
+
 var regl = createREGL({
   extensions: ['OES_texture_float', 'OES_texture_float_linear']
 });
@@ -118,16 +120,154 @@ var drawOverlay = regl({
 });
 
 
+class Circle {
+  constructor(center, radius, clockwise) {
+    this.center = center;
+    this.radius = radius;
+    this.clockwise = clockwise;
+  }
+  arcPoints(a, b) {
+    var angleA = a.angle;
+    var angleB = b.angle;
+    if (this.clockwise && angleA > angleB) {
+      angleB += Math.PI * 2;
+    }
+    if ( ! this.clockwise && angleA < angleB) {
+      angleB -= Math.PI * 2;
+    }
+    var angle = angleB - angleA;
+    var angle01 = Math.abs(angle) / (Math.PI * 2);
+    var resolution = 5;
+    var count = Math.floor(angle01 * resolution);
+    count += 2;
+    var points = [];
+    for (var i = 0; i < count; i++) {
+      points.push(
+        new CirclePoint(a.circle, a.angle + (angle / (count - 1)) * i)
+      );
+    }
+    return points;
+  }
+  homotheticCenters(b) {
+    var a = this;
+    var inner = a.center.clone()
+      .multiplyScalar(b.radius / (a.radius + b.radius))
+      .add(
+        b.center.clone()
+          .multiplyScalar(a.radius / (a.radius + b.radius))
+      );
+    var outer = a.center.clone()
+      .multiplyScalar(-b.radius / (a.radius - b.radius))
+      .add(
+        b.center.clone()
+          .multiplyScalar(a.radius / (a.radius - b.radius))
+      );
+    return {inner: inner, outer: outer};
+  }
+  tangentPoints(b) {
+    var a = this;
+    var centers = a.homotheticCenters(b);
+
+    var angleInnerA = Math.acos(a.radius / a.center.distanceTo(centers.inner));
+    var angleInnerB = Math.acos(b.radius / b.center.distanceTo(centers.inner));
+
+    var angleOuterA = Math.acos(a.radius / a.center.distanceTo(centers.outer));
+    var angleOuterB = Math.acos(b.radius / b.center.distanceTo(centers.outer));
+
+    var v;
+
+    v = centers.inner.clone().sub(a.center);
+    var localInnerA = Math.atan2(v.x, v.y);
+    v = centers.inner.clone().sub(b.center);
+    var localInnerB = Math.atan2(v.x, v.y);
+
+    v = centers.outer.clone().sub(a.center);
+    var localOuterA = Math.atan2(v.x, v.y);
+    v = centers.outer.clone().sub(b.center);
+    var localOuterB = Math.atan2(v.x, v.y);
+
+    var result = {
+      inner: {
+        anticlockwise: [
+          new CirclePoint(a, mod(angleInnerA + localInnerA, Math.PI * 2)),
+          new CirclePoint(b, mod(angleInnerB + localInnerB, Math.PI * 2))
+        ],
+        clockwise: [
+          new CirclePoint(a, mod(-angleInnerA + localInnerA, Math.PI * 2)),
+          new CirclePoint(b, mod(-angleInnerB + localInnerB, Math.PI * 2))
+        ]
+      },
+      outer: {
+        clockwise: [
+          new CirclePoint(a, mod(angleOuterA + localOuterA, Math.PI * 2)),
+          new CirclePoint(b, mod(angleOuterB + localOuterB, Math.PI * 2)),
+        ],
+        anticlockwise: [
+          new CirclePoint(a, mod(-angleOuterA + localOuterA, Math.PI * 2)),
+          new CirclePoint(b, mod(-angleOuterB + localOuterB, Math.PI * 2)),
+        ]
+      }
+    };
+
+    if (a.radius > b.radius) {
+      result = {
+        inner: result.inner,
+        outer: {
+          clockwise: result.outer.anticlockwise,
+          anticlockwise: result.outer.clockwise
+        }
+      };
+    }
+
+    //TODO equal radius
+
+    return result;
+  }
+}
+
+
+class Anchor {
+  constructor(position, handle) {
+    this.position = position;
+    this.handle = handle;
+  }
+  invert() {
+    this.handle.multiplyScalar(-1);
+  }
+}
+
+class CirclePoint {
+  constructor(circle, angle) {
+    this.circle = circle;
+    this.angle = angle;
+  }
+  toAnchor() {
+    var position = new THREE.Vector2(
+      Math.sin(this.angle) * this.circle.radius,
+      Math.cos(this.angle) * this.circle.radius
+    );
+    var perpendicular = new THREE.Vector2(
+      position.y * -1,
+      position.x
+    ).normalize();
+    position.add(this.circle.center);
+    return new Anchor(position, perpendicular);
+  }
+}
+
+
+
 var circles = [];
 
 for (var i = 0; i < 5; i++) {
-  circles.push({
-    center: new THREE.Vector2(
+  circles.push(new Circle(
+    new THREE.Vector2(
       Math.random() * 2 - 1,
       Math.random() * 2 - 1
     ),
-    radius: Math.random() * 0.2 + 0.1
-  });
+    Math.random() * 0.2 + 0.1,
+    i % 2 === 0
+  ));
 }
 
 circles = [{
@@ -135,31 +275,36 @@ circles = [{
     "x":0.51270949530450052,
     "y":0.29910675035724388
   },
-  "radius":0.0944216402148418
+  "radius":0.0944216402148418,
+  "clockwise": false
 },{
   "center":{
     "x":0.01497879920403404,
     "y":0.28396038534998764
   },
-  "radius":0.20537279631523161
+  "radius":0.20537279631523161,
+  "clockwise": false
 },{
   "center":{
     "x":0.1078719574635445,
     "y":-0.3133695586361175
   },
-  "radius":0.31306736207046515
+  "radius":0.31306736207046515,
+  "clockwise": false
 },{
   "center":{
     "x":0.5378719574635445,
     "y":-0.3133695586361175
   },
-  "radius":0.3130673620704651
+  "radius":0.3130673620704651,
+  "clockwise": true
 },{
   "center":{
     "x":-0.9378719574635445,
     "y":-0.5133695586361175
   },
-  "radius":0.21306736207046515
+  "radius":0.21306736207046515,
+  "clockwise": false
 }];
 
 // circles = circles.slice(2, 4);
@@ -167,9 +312,12 @@ circles = [{
 // circles[1].center.y = 0;
 // circles[2].center.x = -.88;
 
-circles.map(function(circle) {
-  circle.center = new THREE.Vector2(circle.center.x, circle.center.y);
-  return circle;
+circles = circles.map(function(circle) {
+  return new Circle(
+    new THREE.Vector2(circle.center.x, circle.center.y),
+    circle.radius,
+    circle.clockwise
+  );
 });
 
 // var tick = regl.frame(function(context) {
@@ -203,47 +351,42 @@ circles.map(function(circle) {
   var circle2;
   var tangentAnchors;
   var startPoint = new THREE.Vector2(0, .5);
-  var clockwise;
+  var tangents;
+
   circles.forEach(function(circle, i) {
-    clockwise = i % 2 === 0;
-    // clockwise = false;
+
     circle1 = circles[i + 1];
     circle2 = circles[i + 2];
     if ( ! circle1) {
       return;
     }
 
-    var invert = clockwise ? 1 : -1;
     var side = 'outer';
 
-    var tangentsStart = findTangentCirclePoints(circle, circle1);
+    tangents = circle.tangentPoints(circle1);
     // debugTangent(debugPositions, tangentsStart.inner.clockwise, false);
     // debugTangent(debugPositions, tangentsStart.outer.clockwise, true);
-    var circlePointsStartA;
-    var circlePointsStartB;
-    if (clockwise) {
-      circlePointsStartA = tangentsStart[side].anticlockwise[0];
-      circlePointsStartB = tangentsStart[side].clockwise[1];
-    } else {
-      circlePointsStartA = tangentsStart[side].clockwise[0];
-      circlePointsStartB = tangentsStart[side].anticlockwise[1];
-    }
+    var circlePointsStartA = circle.clockwise ? tangents[side].clockwise[0] : tangents[side].anticlockwise[0];
+    var circlePointsStartB = circle1.clockwise ? tangents[side].clockwise[1] : tangents[side].anticlockwise[1];
 
     var kink = Math.abs(diffAngles(
-      tangentsStart.outer.anticlockwise[0].angle,
-      tangentsStart.inner.anticlockwise[0].angle
+      tangents.outer.anticlockwise[0].angle,
+      tangents.inner.anticlockwise[0].angle
     ));
     if (isNaN(kink)) {
       kink = 100;
     }
     var kinkWeight = rangec(0.9, 1.4, kink);
 
-    var a1s = circlePointToAnchor(circlePointsStartA);
-    var a2s = circlePointToAnchor(circlePointsStartB);
+    var a1s = circlePointsStartA.toAnchor();
+    var a2s = circlePointsStartB.toAnchor();
 
     var dist = a1s.position.distanceTo(a2s.position);
     var r0 = circle.radius / (circle.radius + circle1.radius);
     var r1 = circle1.radius / (circle.radius + circle1.radius);
+
+    var invert = ! circle.clockwise ? 1 : -1;
+
     var r0far  = r0 * dist * invert * .5;
     var r1far  = r1 * dist * invert * .5;
     var r0near  = dist * invert * .5;
@@ -260,29 +403,24 @@ circles.map(function(circle) {
       return;
     }
 
-    var tangentsEnd = findTangentCirclePoints(circle1, circle2);
-    var circlePointEnd;
-    if (clockwise) {
-      circlePointEnd = tangentsEnd[side].clockwise[0];
-    } else {
-      circlePointEnd = tangentsEnd[side].anticlockwise[0];
-    }
+    tangents = circle1.tangentPoints(circle2);
+    var circlePointEnd = circle1.clockwise ? tangents[side].clockwise[0] : tangents[side].anticlockwise[0];
 
-    var arcPoints = findArcPoints(circlePointsStartB, circlePointEnd, clockwise);
+    var arcPoints = circle1.arcPoints(circlePointsStartB, circlePointEnd);
     arcPoints.forEach(function(arcPoint1, k) {
       var arcPoint2 = arcPoints[k + 1];
       if ( ! arcPoint2) {
         return;
       }
       var size = Math.abs(arcPoint1.angle - arcPoint2.angle) * arcPoint1.circle.radius / 3;
-      var apa1 = circlePointToAnchor(arcPoint1);
-      var apa2 = circlePointToAnchor(arcPoint2);
+      var apa1 = arcPoint1.toAnchor();
+      var apa2 = arcPoint2.toAnchor();
       apa1.handle.multiplyScalar(size);
       apa2.handle.multiplyScalar(size);
-      if (clockwise) {
-        apa1 = invertHandle(apa1);
+      if (circle1.clockwise) {
+        apa1.invert();
       } else {
-        apa2 = invertHandle(apa2);
+        apa2.invert();
       }
       curve.add(createBezier(apa1, apa2));
     });
@@ -396,31 +534,6 @@ function debugTangent(debugPositions, tangent, clockwise) {
   ]);
 }
 
-// a, b: circlePoint
-function findArcPoints(a, b, clockwise) {
-  var angleA = a.angle;
-  var angleB = b.angle;
-  if (clockwise && angleA > angleB) {
-    angleB += Math.PI * 2;
-  }
-  if ( ! clockwise && angleA < angleB) {
-    angleB -= Math.PI * 2;
-  }
-  var angle = angleB - angleA;
-  var angle01 = Math.abs(angle) / (Math.PI * 2);
-  var resolution = 5;
-  var count = Math.floor(angle01 * resolution);
-  count += 2;
-  var points = [];
-  for (var i = 0; i < count; i++) {
-    points.push({
-      circle: a.circle,
-      angle: a.angle + (angle / (count - 1)) * i
-    });
-  }
-  return points;
-}
-
 function diffAngles(a, b) {
   return mod(a - b + Math.PI, Math.PI * 2) - Math.PI;
 }
@@ -443,129 +556,6 @@ function clamp(value, min, max) {
 
 function lerp(v0, v1, t) {
     return v0 * (1 - t) + v1 * t;
-}
-
-function circlePointToAnchor(point) {
-  var position = new THREE.Vector2(
-    Math.sin(point.angle) * point.circle.radius,
-    Math.cos(point.angle) * point.circle.radius
-  );
-  var perpendicular = new THREE.Vector2(
-    position.y * -1,
-    position.x
-  ).normalize();
-  // perpendicular.multiplyScalar(0.01);
-  position.add(point.circle.center);
-  return {
-    position: position,
-    handle: perpendicular
-  };
-}
-
-function invertHandle(anchor) {
-  return {
-    position: anchor.position,
-    handle: anchor.handle.clone().multiplyScalar(-1)
-  };
-}
-
-function findTangentCirclePoints(a, b) {
-  var centers = findHmotheticCenters(a, b);
-
-  var angleInnerA = Math.acos(a.radius / a.center.distanceTo(centers.inner));
-  var angleInnerB = Math.acos(b.radius / b.center.distanceTo(centers.inner));
-
-  var angleOuterA = Math.acos(a.radius / a.center.distanceTo(centers.outer));
-  var angleOuterB = Math.acos(b.radius / b.center.distanceTo(centers.outer));
-
-  var v;
-
-  v = centers.inner.clone().sub(a.center);
-  var localInnerA = Math.atan2(v.x, v.y);
-  v = centers.inner.clone().sub(b.center);
-  var localInnerB = Math.atan2(v.x, v.y);
-
-  v = centers.outer.clone().sub(a.center);
-  var localOuterA = Math.atan2(v.x, v.y);
-  v = centers.outer.clone().sub(b.center);
-  var localOuterB = Math.atan2(v.x, v.y);
-
-  var result = {
-    inner: {
-      anticlockwise: [
-        {
-          angle: mod(angleInnerA + localInnerA, Math.PI * 2),
-          circle: a
-        },
-        {
-          angle: mod(angleInnerB + localInnerB, Math.PI * 2),
-          circle: b
-        }
-      ],
-      clockwise: [
-        {
-          angle: mod(-angleInnerA + localInnerA, Math.PI * 2),
-          circle: a
-        },
-        {
-          angle: mod(-angleInnerB + localInnerB, Math.PI * 2),
-          circle: b
-        }
-      ]
-    },
-    outer: {
-      clockwise: [
-        {
-          angle: mod(angleOuterA + localOuterA, Math.PI * 2),
-          circle: a
-        },
-        {
-          angle: mod(angleOuterB + localOuterB, Math.PI * 2),
-          circle: b
-        }
-      ],
-      anticlockwise: [
-        {
-          angle: mod(-angleOuterA + localOuterA, Math.PI * 2),
-          circle: a
-        },
-        {
-          angle: mod(-angleOuterB + localOuterB, Math.PI * 2),
-          circle: b
-        }
-      ]
-    }
-  };
-
-  if (a.radius > b.radius) {
-    result = {
-      inner: result.inner,
-      outer: {
-        clockwise: result.outer.anticlockwise,
-        anticlockwise: result.outer.clockwise
-      }
-    };
-  }
-
-  //TODO equal radius
-
-  return result;
-}
-
-function findHmotheticCenters(a, b) {
-  var inner = a.center.clone()
-    .multiplyScalar(b.radius / (a.radius + b.radius))
-    .add(
-      b.center.clone()
-        .multiplyScalar(a.radius / (a.radius + b.radius))
-    );
-  var outer = a.center.clone()
-    .multiplyScalar(-b.radius / (a.radius - b.radius))
-    .add(
-      b.center.clone()
-        .multiplyScalar(a.radius / (a.radius - b.radius))
-    );
-  return {inner: inner, outer: outer};
 }
 
 function createBezier(anchorA, anchorB) {
