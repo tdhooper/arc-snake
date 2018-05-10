@@ -256,6 +256,128 @@ class CirclePoint {
 }
 
 
+class CircleCurve {
+  constructor(circles) {
+    this.circles = circles;
+  }
+  curve() {
+    var path = new THREE.CurvePath();
+    this.curvesForCircles().forEach(function(curve) {
+      path.add(curve);
+    });
+    return path;
+  }
+  curvesForCircles() {
+    var curves = [];
+    var circle1, circle2;
+    this.circles.forEach(function(circle, i) {
+      circle1 = circles[i + 1];
+      circle2 = circles[i + 2];
+      if (circle1) {
+        curves.push(this.createCurveFromCircles(circle, circle1, circle2));
+      }
+    }.bind(this));
+    return curves;
+  }
+  createCurveFromCircles(circle, circle1, circle2) {
+    if ( ! circle1) {
+      throw Error('Need at least two circles');
+    }
+
+    var tangents = circle.tangentPoints(circle1);
+    var pointA = circle.clockwise ? tangents.outer.clockwise[0] : tangents.outer.anticlockwise[0];
+    var pointB = circle1.clockwise ? tangents.outer.clockwise[1] : tangents.outer.anticlockwise[1];
+
+    var kink = Math.abs(diffAngles(
+      tangents.outer.anticlockwise[0].angle,
+      tangents.inner.anticlockwise[0].angle
+    ));
+    if (isNaN(kink)) {
+      kink = 100;
+    }
+    var kinkWeight = rangec(0.9, 1.4, kink);
+
+    var a1s = pointA.toAnchor();
+    var a2s = pointB.toAnchor();
+
+    var dist = a1s.position.distanceTo(a2s.position);
+    var r0 = circle.radius / (circle.radius + circle1.radius);
+    var r1 = circle1.radius / (circle.radius + circle1.radius);
+
+    var invert = ! circle.clockwise ? 1 : -1;
+
+    var r0far  = r0 * dist * invert * .5;
+    var r1far  = r1 * dist * invert * .5;
+    var r0near  = dist * invert * .5;
+    var r1near  = dist * invert * .5;
+    
+    r0 = lerp(r0far, r0near, kinkWeight);
+    r1 = lerp(r1far, r1near, kinkWeight);
+    a1s.handle.multiplyScalar(r0);
+    a2s.handle.multiplyScalar(r1);
+
+    var curve = new THREE.CurvePath();
+    curve.add(this.createCurveFromAnchors(a1s, a2s));
+
+    if ( ! circle2) {
+      return curve;
+    }
+
+    tangents = circle1.tangentPoints(circle2);
+    var pointC = circle1.clockwise ? tangents.outer.clockwise[0] : tangents.outer.anticlockwise[0];
+    var arcCurves = this.createCurvesFromPoints(pointB, pointC);
+    arcCurves.forEach(function(arcCurve) {
+      curve.add(arcCurve);
+    });
+    return curve;
+  }
+  createCurvesFromPoints(pointA, pointB) {
+    if (pointA.circle !== pointB.circle) {
+      throw Error('Points must be on the same circle');
+    }
+    var circle = pointA.circle;
+    var arcPoints = circle.arcPoints(pointA, pointB);
+    var curves = [];
+    arcPoints.forEach(function(arcPoint1, k) {
+      var arcPoint2 = arcPoints[k + 1];
+      if ( ! arcPoint2) {
+        return;
+      }
+      var size = Math.abs(arcPoint1.angle - arcPoint2.angle) * circle.radius / 3;
+      var apa1 = arcPoint1.toAnchor();
+      var apa2 = arcPoint2.toAnchor();
+      apa1.handle.multiplyScalar(size);
+      apa2.handle.multiplyScalar(size);
+      if (circle.clockwise) {
+        apa1.invert();
+      } else {
+        apa2.invert();
+      }
+      curves.push(this.createCurveFromAnchors(apa1, apa2));
+    }.bind(this));
+    return curves;
+  }
+  createCurveFromAnchors(anchorA, anchorB) {
+    return new THREE.CubicBezierCurve(
+      anchorA.position,
+      anchorA.position.clone().add(anchorA.handle),
+      anchorB.position.clone().add(anchorB.handle),
+      anchorB.position
+    );
+  }
+}
+
+
+    // circleForCurvePosition(position)
+    //     curveLength = 0
+    //     curvesForCircles = circleCurve.curvesForCircles()
+    //     curvesForCircles.each
+    //         curveLength += curvesForCircle.getLength()
+    //         if curveLength > position:
+    //             return i
+
+
+
 
 var circles = [];
 
@@ -307,7 +429,7 @@ circles = [{
   "clockwise": false
 }];
 
-// circles = circles.slice(2, 4);
+// circles = circles.slice(0, 2);
 
 // circles[1].center.y = 0;
 // circles[2].center.x = -.88;
@@ -346,98 +468,7 @@ circles = circles.map(function(circle) {
 
   var debugPositions = [];
 
-
-  var circle1;
-  var circle2;
-  var tangentAnchors;
-  var startPoint = new THREE.Vector2(0, .5);
-  var tangents;
-
-  circles.forEach(function(circle, i) {
-
-    circle1 = circles[i + 1];
-    circle2 = circles[i + 2];
-    if ( ! circle1) {
-      return;
-    }
-
-    var side = 'outer';
-
-    tangents = circle.tangentPoints(circle1);
-    // debugTangent(debugPositions, tangentsStart.inner.clockwise, false);
-    // debugTangent(debugPositions, tangentsStart.outer.clockwise, true);
-    var circlePointsStartA = circle.clockwise ? tangents[side].clockwise[0] : tangents[side].anticlockwise[0];
-    var circlePointsStartB = circle1.clockwise ? tangents[side].clockwise[1] : tangents[side].anticlockwise[1];
-
-    var kink = Math.abs(diffAngles(
-      tangents.outer.anticlockwise[0].angle,
-      tangents.inner.anticlockwise[0].angle
-    ));
-    if (isNaN(kink)) {
-      kink = 100;
-    }
-    var kinkWeight = rangec(0.9, 1.4, kink);
-
-    var a1s = circlePointsStartA.toAnchor();
-    var a2s = circlePointsStartB.toAnchor();
-
-    var dist = a1s.position.distanceTo(a2s.position);
-    var r0 = circle.radius / (circle.radius + circle1.radius);
-    var r1 = circle1.radius / (circle.radius + circle1.radius);
-
-    var invert = ! circle.clockwise ? 1 : -1;
-
-    var r0far  = r0 * dist * invert * .5;
-    var r1far  = r1 * dist * invert * .5;
-    var r0near  = dist * invert * .5;
-    var r1near  = dist * invert * .5;
-    
-    r0 = lerp(r0far, r0near, kinkWeight);
-    r1 = lerp(r1far, r1near, kinkWeight);
-    a1s.handle.multiplyScalar(r0);
-    a2s.handle.multiplyScalar(r1);
-
-    curve.add(createBezier(a1s, a2s));
-
-    if ( ! circle2) {
-      return;
-    }
-
-    tangents = circle1.tangentPoints(circle2);
-    var circlePointEnd = circle1.clockwise ? tangents[side].clockwise[0] : tangents[side].anticlockwise[0];
-
-    var arcPoints = circle1.arcPoints(circlePointsStartB, circlePointEnd);
-    arcPoints.forEach(function(arcPoint1, k) {
-      var arcPoint2 = arcPoints[k + 1];
-      if ( ! arcPoint2) {
-        return;
-      }
-      var size = Math.abs(arcPoint1.angle - arcPoint2.angle) * arcPoint1.circle.radius / 3;
-      var apa1 = arcPoint1.toAnchor();
-      var apa2 = arcPoint2.toAnchor();
-      apa1.handle.multiplyScalar(size);
-      apa2.handle.multiplyScalar(size);
-      if (circle1.clockwise) {
-        apa1.invert();
-      } else {
-        apa2.invert();
-      }
-      curve.add(createBezier(apa1, apa2));
-    });
-
-    // var a1e = circlePointToAnchor(circlePointsEnd[0]);
-    // a1e.handle.multiplyScalar(circle1.radius * .5 * invert);
-
-    // curve.add(createBezier(invertHandle(a2s), a1e));
-  });
-
-  /*
-
-  three circles
-  draw from first to next
-  draw points until next tangent
-  
-  */
+  var circleCurve = new CircleCurve(circles);
 
   /*
   var desiredLen = 5;
@@ -449,6 +480,7 @@ circles = circles.map(function(circle) {
   }
   */
 
+  var curve = circleCurve.curve();
   var curvePoints = curve.getSpacedPoints(texturePoints - 1);
 
   //var curvePoints = curve.getSpacedPoints(texturePoints - 1);
@@ -552,13 +584,4 @@ function clamp(value, min, max) {
 
 function lerp(v0, v1, t) {
     return v0 * (1 - t) + v1 * t;
-}
-
-function createBezier(anchorA, anchorB) {
-  return new THREE.CubicBezierCurve(
-    anchorA.position,
-    anchorA.position.clone().add(anchorA.handle),
-    anchorB.position.clone().add(anchorB.handle),
-    anchorB.position
-  );
 }
