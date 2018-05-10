@@ -7,12 +7,12 @@ curve
 
 snake head position = distance from start of curve
 
+snakeHead = 0
+snakeLength = 5
 
 circleCurve = new CircleCurve()
-while circleCurve.circles.length < 5
+while circleCurve.curve().getLength < snakeLength
     circleCurve.circles.push(randomCircle())
-
-snakeHead = 0
 
 loop
 

@@ -258,7 +258,7 @@ class CirclePoint {
 
 class CircleCurve {
   constructor(circles) {
-    this.circles = circles;
+    this.circles = circles || [];
   }
   curve() {
     var path = new THREE.CurvePath();
@@ -271,8 +271,8 @@ class CircleCurve {
     var curves = [];
     var circle1, circle2;
     this.circles.forEach(function(circle, i) {
-      circle1 = circles[i + 1];
-      circle2 = circles[i + 2];
+      circle1 = this.circles[i + 1];
+      circle2 = this.circles[i + 2];
       if (circle1) {
         curves.push(this.createCurveFromCircles(circle, circle1, circle2));
       }
@@ -378,69 +378,14 @@ class CircleCurve {
 
 
 
+var snakeHead = 0;
+var snakeLength = 3;
 
-var circles = [];
-
-for (var i = 0; i < 5; i++) {
-  circles.push(new Circle(
-    new THREE.Vector2(
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1
-    ),
-    Math.random() * 0.2 + 0.1,
-    i % 2 === 0
-  ));
+var circleCurve = new CircleCurve();
+while ((circleCurve.curve().getLength() || 0) < snakeLength) {
+  circleCurve.circles.push(randomCircle());
 }
 
-circles = [{
-  "center":{
-    "x":0.51270949530450052,
-    "y":0.29910675035724388
-  },
-  "radius":0.0944216402148418,
-  "clockwise": false
-},{
-  "center":{
-    "x":0.01497879920403404,
-    "y":0.28396038534998764
-  },
-  "radius":0.20537279631523161,
-  "clockwise": false
-},{
-  "center":{
-    "x":0.1078719574635445,
-    "y":-0.3133695586361175
-  },
-  "radius":0.31306736207046515,
-  "clockwise": false
-},{
-  "center":{
-    "x":0.5378719574635445,
-    "y":-0.3133695586361175
-  },
-  "radius":0.3130673620704651,
-  "clockwise": true
-},{
-  "center":{
-    "x":-0.9378719574635445,
-    "y":-0.5133695586361175
-  },
-  "radius":0.21306736207046515,
-  "clockwise": false
-}];
-
-// circles = circles.slice(0, 2);
-
-// circles[1].center.y = 0;
-// circles[2].center.x = -.88;
-
-circles = circles.map(function(circle) {
-  return new Circle(
-    new THREE.Vector2(circle.center.x, circle.center.y),
-    circle.radius,
-    circle.clockwise
-  );
-});
 
 // var tick = regl.frame(function(context) {
   regl.clear({
@@ -452,8 +397,6 @@ circles = circles.map(function(circle) {
   //   Math.sin(context.time),
   //   Math.cos(context.time)
   // );
-  
-  var curve = new THREE.CurvePath();  
 
   var part;
 
@@ -468,8 +411,6 @@ circles = circles.map(function(circle) {
 
   var debugPositions = [];
 
-  var circleCurve = new CircleCurve(circles);
-
   /*
   var desiredLen = 5;
   var len = curve.getLength();
@@ -481,7 +422,7 @@ circles = circles.map(function(circle) {
   */
 
   var curve = circleCurve.curve();
-  var curvePoints = curve.getSpacedPoints(texturePoints - 1);
+  var curvePoints = spacedPointsBetween(curve, 0, curve.getLength(), texturePoints);
 
   //var curvePoints = curve.getSpacedPoints(texturePoints - 1);
   var curvePointsFormatted = curvePoints.reduce(function(acc, v) {
@@ -494,8 +435,8 @@ circles = circles.map(function(circle) {
   draw();
 
   var segments = 20;
-  circles.forEach(function(circle, i) {
-    var colIndex = i / circles.length;
+  circleCurve.circles.forEach(function(circle, i) {
+    var colIndex = i / circleCurve.circles.length;
     for (var i = 0; i < segments; i++) {
       var j = (i + 1) % segments;
       debugPositions.push([
@@ -584,4 +525,29 @@ function clamp(value, min, max) {
 
 function lerp(v0, v1, t) {
     return v0 * (1 - t) + v1 * t;
+}
+
+function randomCircle() {
+  return new Circle(
+    new THREE.Vector2(
+      Math.random() * 2 - 1,
+      Math.random() * 2 - 1
+    ),
+    Math.random() * 0.2 + 0.1,
+    Math.random() > 0.5
+  );
+}
+
+function spacedPointsBetween(curve, start, end, divisions) {
+  var curveLength = curve.getLength();
+  var uStart = start / curveLength;
+  var uEnd = end / curveLength;
+  var uLength = uEnd - uStart;
+  var points = [];
+  var u;
+  for (var i = 0; i < divisions; i++) {
+    u = uStart + uLength * (i / divisions);
+    points.push(curve.getPointAt(u));
+  }
+  return points;
 }
