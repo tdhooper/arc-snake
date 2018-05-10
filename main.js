@@ -439,10 +439,6 @@ circles = circles.map(function(circle) {
   
   */
 
-  // circles.forEach(function(circle) {
-  //   addCircleToPath(curve, circle);
-  // });
-
   /*
   var desiredLen = 5;
   var len = curve.getLength();
@@ -566,79 +562,3 @@ function createBezier(anchorA, anchorB) {
     anchorB.position
   );
 }
-
-function curvePart(
-  offset,
-  width,
-  startY,
-  endY
-) {
-  var start = new THREE.Vector2(offset, startY);
-  var end = new THREE.Vector2(offset + width, endY);
-  var handle = start.distanceTo(end) / 3;
-  handle += (Math.abs(startY) + Math.abs(endY)) * .33;
-  var startHandle = new THREE.Vector2(
-    offset + handle,
-    startY
-  );
-  var endHandle = new THREE.Vector2(
-    offset + width - handle,
-    endY
-  );
-  return new THREE.CubicBezierCurve(
-    start,
-    startHandle,
-    endHandle,
-    end
-  );
-}
-
-function addCircleToPath(curve, circle) {
-  for (var i = 0; i < 4; i++) {
-    var j = (i + 1) % 4;
-    var a1 = (i / 4) * Math.PI * 2;
-    var a2 = (j / 4) * Math.PI * 2;
-    var h1 = ((i + 1) / 4) * Math.PI * 2;
-    var h2 = ((j - 1) / 4) * Math.PI * 2;
-    var anchorA = {
-      position: new THREE.Vector2(
-        circle.center.x + Math.sin(a1) * circle.radius,
-        circle.center.y + Math.cos(a1) * circle.radius
-      ),
-      handle: new THREE.Vector2(
-        Math.sin(h1) * circle.radius / 2,
-        Math.cos(h1) * circle.radius / 2
-      )
-    };
-    var anchorB = {
-      position: new THREE.Vector2(
-        circle.center.x + Math.sin(a2) * circle.radius,
-        circle.center.y + Math.cos(a2) * circle.radius
-      ),
-      handle: new THREE.Vector2(
-        Math.sin(h2) * circle.radius / 2,
-        Math.cos(h2) * circle.radius / 2
-      )
-    };
-    curve.add(createBezier(anchorA, anchorB));
-  }
-}
-
-/*
-
-
-
-Anchor
-  Point
-  Handle
-
-for circle in circles
-  nextCircle = circles[i + 1]
-  anchorA, anchorB = tangent(circle, nextCircle)
-  if ! lastAnchor
-    lastAnchor = Anchor startPoint -anchorA.handle
-  bezier lastAnchor anchorA
-  bezier anchorA anchorB
-  lastAnchor anchorB
-
-*/
