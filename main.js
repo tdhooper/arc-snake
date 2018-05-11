@@ -267,16 +267,32 @@ class CircleCurve {
     });
     return path;
   }
+  circleForCurvePosition(position) {
+    var curveLength = 0;
+    var curvesForCircles = this.curvesForCircles();
+    for (var i = 0; i < curvesForCircles.length; i++) {
+      curveLength += curvesForCircles[i].getLength();
+      // console.log(curveLength);
+      if (curveLength > position) {
+        return i;
+      }
+    }
+    return i;
+  }
   curvesForCircles() {
     var curves = [];
-    var circle1, circle2;
-    this.circles.forEach(function(circle, i) {
+    var circle0, circle1, circle2;
+    // 0, 1
+    // 0, 1, 2 (but not first joining curve)
+
+    for (var i = 0; i < this.circles.length; i++) {
+      circle0 = this.circles[i];
       circle1 = this.circles[i + 1];
       circle2 = this.circles[i + 2];
       if (circle1) {
-        curves.push(this.createCurveFromCircles(circle, circle1, circle2));
+        curves.push(this.createCurveFromCircles(circle0, circle1, circle2));
       }
-    }.bind(this));
+    }
     return curves;
   }
   createCurveFromCircles(circle, circle1, circle2) {
@@ -368,26 +384,41 @@ class CircleCurve {
 }
 
 
-    // circleForCurvePosition(position)
-    //     curveLength = 0
-    //     curvesForCircles = circleCurve.curvesForCircles()
-    //     curvesForCircles.each
-    //         curveLength += curvesForCircle.getLength()
-    //         if curveLength > position:
-    //             return i
-
-
-
-var snakeHead = 0;
-var snakeLength = 3;
+var snakeLength = 2;
+var snakeHead = snakeLength;
 
 var circleCurve = new CircleCurve();
 while ((circleCurve.curve().getLength() || 0) < snakeLength) {
   circleCurve.circles.push(randomCircle());
 }
 
+var delta = 0;
+var lastTime = 0;
 
-// var tick = regl.frame(function(context) {
+var tick = regl.frame(function(context) {
+  delta = context.time - lastTime;
+  lastTime = context.time;
+
+  snakeHead += delta * 10;
+
+  // Add circles until we have enough curve to move into
+  while (snakeHead > circleCurve.curve().getLength()) {
+    circleCurve.circles.push(randomCircle());
+  }
+
+  // // Remove unused circles
+  var snakeTail = snakeHead - snakeLength;
+  var removeIndex = circleCurve.circleForCurvePosition(snakeTail);
+  // console.log('circles', circleCurve.circles.length);
+  // console.log('removeIndex', removeIndex);
+  var before = circleCurve.curve().getLength();
+  // console.log('curve length before', after);
+  circleCurve.circles = circleCurve.circles.slice(removeIndex);
+  var after = circleCurve.curve().getLength();
+  // console.log('circles now', after);
+  snakeHead -= before - after;
+  snakeTail = snakeHead - snakeLength;
+
   regl.clear({
     color: [1, 1, 1, 1],
     depth: 1
@@ -397,8 +428,6 @@ while ((circleCurve.curve().getLength() || 0) < snakeLength) {
   //   Math.sin(context.time),
   //   Math.cos(context.time)
   // );
-
-  var part;
 
 // for circle in circles
 //   nextCircle = circles[i + 1]
@@ -422,9 +451,15 @@ while ((circleCurve.curve().getLength() || 0) < snakeLength) {
   */
 
   var curve = circleCurve.curve();
-  var curvePoints = spacedPointsBetween(curve, 0, curve.getLength(), texturePoints);
-
-  //var curvePoints = curve.getSpacedPoints(texturePoints - 1);
+  // console.log('curve length', curve.getLength());
+  // console.log('head', snakeHead);
+  // console.log('tail', snakeTail);
+  var curvePoints = spacedPointsBetween(curve, snakeHead, snakeTail, texturePoints);
+  // var curvesForCircles = circleCurve.curvesForCircles();
+  // curvePoints = curvesForCircles[0].getSpacedPoints(texturePoints - 1);
+  // curvePoints = curvesForCircles[curvesForCircles.length - 1].getSpacedPoints(texturePoints - 1);
+  // curvePoints = curve.getSpacedPoints(texturePoints - 1);
+  // var curvePoints = curve.getSpacedPoints(texturePoints - 1);
   var curvePointsFormatted = curvePoints.reduce(function(acc, v) {
     return acc.concat((v.x * .5 + .5) * 255, (v.y * .5 + .5) * 255);
   }, []);
@@ -457,13 +492,17 @@ while ((circleCurve.curve().getLength() || 0) < snakeLength) {
     }
   });
 
-  drawOverlay(regl({
-    attributes: {
-      position: debugPositions
-    },
-    count: debugPositions.length
-  }));
-// });
+  // drawOverlay(regl({
+  //   attributes: {
+  //     position: debugPositions
+  //   },
+  //   count: debugPositions.length
+  // }));
+
+//   if (context.time > .1) {
+//   debugger;
+// } 
+});
 
 
 function debugTangent(debugPositions, tangent, clockwise) {
@@ -533,7 +572,7 @@ function randomCircle() {
       Math.random() * 2 - 1,
       Math.random() * 2 - 1
     ),
-    Math.random() * 0.2 + 0.1,
+    Math.random() * 0.4 + 0.1,
     Math.random() > 0.5
   );
 }

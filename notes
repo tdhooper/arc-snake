@@ -1,3 +1,39 @@
+NEED TO REVERSE SNAKE DIRECTION
+
+
+0, -1
+small
+
+0, -1, -2, -3, -4
+small           big
+
+1, 0, -1, -2, -3
+small           big
+
+
+=
+
+= =
+ -  (join)
+
+= = =
+  --  (arc, join)
+
+= = = =
+    --  (arc, join)
+
+
+curveBefore
+curve
+(join)
+
+
+curveBefore
+curve
+curveAfter
+(arc, join)
+
+
 
 curve
      0 1 2 ...
