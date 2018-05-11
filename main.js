@@ -384,12 +384,16 @@ class CircleCurve {
 }
 
 
-var snakeLength = 2;
+var snakeLength = 3;
 var snakeHead = snakeLength;
 
 var circleCurve = new CircleCurve();
 while ((circleCurve.curve().getLength() || 0) < snakeLength) {
-  circleCurve.circles.push(randomCircle());
+  circleCurve.circles.push(
+    randomCircle(
+      circleCurve.circles[circleCurve.circles.length - 1]
+    )
+  );
 }
 
 var delta = 0;
@@ -399,11 +403,15 @@ var tick = regl.frame(function(context) {
   delta = context.time - lastTime;
   lastTime = context.time;
 
-  snakeHead += delta * 10;
+  snakeHead += delta * 6;
 
   // Add circles until we have enough curve to move into
   while (snakeHead > circleCurve.curve().getLength()) {
-    circleCurve.circles.push(randomCircle());
+    circleCurve.circles.push(
+      randomCircle(
+        circleCurve.circles[circleCurve.circles.length - 1]
+      )
+    );
   }
 
   // // Remove unused circles
@@ -566,8 +574,8 @@ function lerp(v0, v1, t) {
     return v0 * (1 - t) + v1 * t;
 }
 
-function randomCircle() {
-  return new Circle(
+function randomCircle(lastCircle) {
+  var circle = new Circle(
     new THREE.Vector2(
       Math.random() * 2 - 1,
       Math.random() * 2 - 1
@@ -575,6 +583,18 @@ function randomCircle() {
     Math.random() * 0.4 + 0.1,
     Math.random() > 0.5
   );
+  if ( ! lastCircle) {
+    return circle;
+  }
+  var distance = circle.center.distanceTo(lastCircle.center);
+  var diff = distance - circle.radius + lastCircle.radius;
+  if (diff < 0) {
+    var direction = circle.center.clone().sub(lastCircle.center);
+    direction = direction.normalize();
+    direction.multiplyScalar(-diff + Math.random() * .2);
+    circle.center.add(direction);
+  }
+  return circle;
 }
 
 function spacedPointsBetween(curve, start, end, divisions) {
