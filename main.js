@@ -605,7 +605,7 @@ function randomCircle(lastCircle) {
     return circle;
   }
   var distance = circle.center.distanceTo(lastCircle.center);
-  var diff = distance - circle.radius + lastCircle.radius;
+  var diff = distance - circle.radius - lastCircle.radius;
   if (diff < 0) {
     var direction = circle.center.clone().sub(lastCircle.center);
     direction = direction.normalize();
