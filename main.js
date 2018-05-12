@@ -94,6 +94,7 @@ var drawOverlay = regl({
 
   void main() {
     vec3 c = spectrum(colIndex);
+    c = mix(c, vec3(1), .5);
     gl_FragColor = vec4(c, 1);
   }`,
 
@@ -336,7 +337,7 @@ class CircleCurve {
     a1s.handle.multiplyScalar(r0);
     a2s.handle.multiplyScalar(r1);
 
-    debugAnchors(a1s, a2s, false, this.circles.indexOf(circle) / this.circles.length);
+    // debugAnchors(a1s, a2s, false, this.circles.indexOf(circle) / this.circles.length);
 
     var curve = new THREE.CurvePath();
     curve.add(this.createCurveFromAnchors(a1s, a2s));
@@ -393,7 +394,7 @@ var seed = Math.random();
 console.log(seed);
 Math.seedrandom(0.5490353568839184);
 
-var snakeLength = 4;
+var snakeLength = 1;
 var snakeHead = snakeLength;
 
 var circleCurve = new CircleCurve();
@@ -404,6 +405,58 @@ while ((circleCurve.curve().getLength() || 0) < snakeLength) {
     )
   );
 }
+
+var specs = [
+  -1, .03,
+  .1, .04,
+  .1, .08,
+  .1, .09,
+  .4, .1,
+  .4, .15
+];
+
+
+// specs = [];
+// var numSpecs = 4;
+// var gap = .4;
+// var size = .02;
+// var sizeInc = .1;
+// for (var i = 0; i < numSpecs * 2 - 1; i++) {
+//   if (i == 0) {
+//     specs.push(-1);
+//   } else {
+//     specs.push(gap);
+//   }
+//   specs.push(size);
+//   if (i >= numSpecs - 1) {
+//     size -= sizeInc;
+//   } else {
+//     size += sizeInc;
+//   }
+// }
+
+
+circleCurve.circles = [];
+var pos = 0;
+specs.forEach(function(size, i) {
+  if (i % 2 == 0) {
+    pos += size;
+  } else {
+    pos += size;
+    circleCurve.circles.push(
+      new Circle(
+        new THREE.Vector2(pos, 0),
+        size,
+        Math.floor(i / 2) % 2 == 0
+      )
+    );
+    pos += size;
+  }
+});
+
+snakeLength = circleCurve.curve().getLength();
+snakeHead = snakeLength;
+
 
 var delta = 0;
 var lastTime = 0;
