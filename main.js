@@ -120,6 +120,9 @@ var drawOverlay = regl({
 });
 
 
+var debugPositions = [];
+
+
 class Circle {
   constructor(center, radius, clockwise) {
     this.center = center;
@@ -320,17 +323,20 @@ class CircleCurve {
     var r0 = circle.radius / (circle.radius + circle1.radius);
     var r1 = circle1.radius / (circle.radius + circle1.radius);
 
-    var invert = ! circle.clockwise ? 1 : -1;
+    var invertA = ! circle.clockwise ? 1 : -1;
+    var invertB = ! circle1.clockwise ? -1 : 1;
 
-    var r0far  = r0 * dist * invert * .5;
-    var r1far  = r1 * dist * invert * .5;
-    var r0near  = dist * invert * .5;
-    var r1near  = dist * invert * .5;
+    var r0far  = r0 * dist * invertA * .5;
+    var r1far  = r1 * dist * invertB * .5;
+    var r0near  = dist * invertA * .5;
+    var r1near  = dist * invertB * .5;
     
     r0 = lerp(r0far, r0near, kinkWeight);
     r1 = lerp(r1far, r1near, kinkWeight);
     a1s.handle.multiplyScalar(r0);
     a2s.handle.multiplyScalar(r1);
+
+    debugAnchors(a1s, a2s, false, this.circles.indexOf(circle) / this.circles.length);
 
     var curve = new THREE.CurvePath();
     curve.add(this.createCurveFromAnchors(a1s, a2s));
@@ -383,8 +389,11 @@ class CircleCurve {
   }
 }
 
+var seed = Math.random();
+console.log(seed);
+Math.seedrandom(0.5490353568839184);
 
-var snakeLength = 3;
+var snakeLength = 4;
 var snakeHead = snakeLength;
 
 var circleCurve = new CircleCurve();
@@ -399,7 +408,11 @@ while ((circleCurve.curve().getLength() || 0) < snakeLength) {
 var delta = 0;
 var lastTime = 0;
 
-var tick = regl.frame(function(context) {
+// var tick = regl.frame(tickDraw);
+
+tickDraw({time: 0});
+
+function tickDraw(context) {  
   delta = context.time - lastTime;
   lastTime = context.time;
 
@@ -446,8 +459,6 @@ var tick = regl.frame(function(context) {
 //   bezier anchorA anchorB
 //   lastAnchor anchorB
 
-  var debugPositions = [];
-
   /*
   var desiredLen = 5;
   var len = curve.getLength();
@@ -480,44 +491,51 @@ var tick = regl.frame(function(context) {
   var segments = 20;
   circleCurve.circles.forEach(function(circle, i) {
     var colIndex = i / circleCurve.circles.length;
-    for (var i = 0; i < segments; i++) {
-      var j = (i + 1) % segments;
-      debugPositions.push([
-        circle.center.x,
-        circle.center.y,
-        colIndex
-      ]);
-      debugPositions.push([
-        circle.center.x + Math.sin((i / segments) * Math.PI * 2) * circle.radius,
-        circle.center.y + Math.cos((i / segments) * Math.PI * 2) * circle.radius,
-        colIndex
-      ]);
-      debugPositions.push([
-        circle.center.x + Math.sin((j / segments) * Math.PI * 2) * circle.radius,
-        circle.center.y + Math.cos((j / segments) * Math.PI * 2) * circle.radius,
-        colIndex
-      ]);
-    }
+    debugCircle(circle.center, circle.radius, colIndex);
   });
 
-  // drawOverlay(regl({
-  //   attributes: {
-  //     position: debugPositions
-  //   },
-  //   count: debugPositions.length
-  // }));
+  drawOverlay(regl({
+    attributes: {
+      position: debugPositions
+    },
+    count: debugPositions.length
+  }));
 
 //   if (context.time > .1) {
 //   debugger;
 // } 
-});
+}
 
+function debugCircle(center, radius, colIndex) {
+  var segments = 20;
+  for (var i = 0; i < segments; i++) {
+    var j = (i + 1) % segments;
+    debugPositions.push([
+      center.x,
+      center.y,
+      colIndex
+    ]);
+    debugPositions.push([
+      center.x + Math.sin((i / segments) * Math.PI * 2) * radius,
+      center.y + Math.cos((i / segments) * Math.PI * 2) * radius,
+      colIndex
+    ]);
+    debugPositions.push([
+      center.x + Math.sin((j / segments) * Math.PI * 2) * radius,
+      center.y + Math.cos((j / segments) * Math.PI * 2) * radius,
+      colIndex
+    ]);
+  }
+}
 
-function debugTangent(debugPositions, tangent, clockwise) {
-  var anchorA = circlePointToAnchor(tangent[0]);
-  var anchorB = circlePointToAnchor(tangent[1]);
+function debugAnchors(anchorA, anchorB, clockwise, colIndex) {
   var width = .1;
   var color = clockwise ? 0 : .5;
+
+  debugCircle(anchorA.position.clone().add(anchorA.handle), .1, colIndex);
+  debugCircle(anchorB.position.clone().add(anchorB.handle), .1, colIndex);
+
+  return;
   debugPositions.push([
     anchorA.position.x,
     anchorA.position.y,
