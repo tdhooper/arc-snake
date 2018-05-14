@@ -285,47 +285,146 @@ class CircleCurve {
   }
   curvesForCircles() {
     var curves = [];
-    var circle0, circle1, circle2;
-    // 0, 1
-    // 0, 1, 2 (but not first joining curve)
-
+    var prevPrev, prev, current, next;
     for (var i = 0; i < this.circles.length; i++) {
-      circle0 = this.circles[i];
-      circle1 = this.circles[i + 1];
-      circle2 = this.circles[i + 2];
-      if (circle1) {
-        curves.push(this.createCurveFromCircles(circle0, circle1, circle2));
+      prevPrev = this.circles[i - 2];
+      prev = this.circles[i - 1];
+      current = this.circles[i];
+      next = this.circles[i + 1];
+      if (prev) {
+        curves.push(this.createCurveForCircles(prevPrev, prev, current, next));
       }
     }
     return curves;
   }
-  createCurveFromCircles(circle, circle1, circle2) {
-    if ( ! circle1) {
-      throw Error('Need at least two circles');
+  createCurveForCircles(prevPrev, prev, current, next) {
+    var curve = new THREE.CurvePath();
+    var anchors = this.findAnchors(prevPrev, prev, current, next);
+    for (var i = 0; i < anchors.length; i++) {
+      curve.add(this.createCurveFromAnchors(anchors[i][0], anchors[i][1]));
+    }
+    return curve;
+  }
+  findAnchors(prevPrev, prev, current, next) {
+    var anchors = [];
+    var joins = this.findJoins(prevPrev, prev, current, next);
+    var joinA, joinB;
+    for (var i = 0; i < joins.length; i++) {
+      joinA = joins[i][0];
+      joinB = joins[i][1];
+      if (joinA.point.circle !== joinB.point.circle) {
+        anchors.push(this.circleJoinAnchors(joinA, joinB));
+      } else {
+        anchors = anchors.concat(this.arcJoinAnchors(joinA, joinB));
+      }
+    }
+    return anchors;
+  }
+  findJoins(prevPrev, prev, current, next) {
+
+    var joins = [];
+    var joinA, joinB;
+
+    // join
+    //   CirclePoint point
+    //   CirclePoint idealPoint
+
+    // create beziers between every pair of joins
+
+    // get last join of previous circle
+
+    var prevCurrentTangents = prev.tangentPoints(current);
+
+    if (prevPrev) {
+      var prevJoins = this.findJoins(null, prevPrev, prev, current);
+      joinA = prevJoins[prevJoins.length - 1][1];
+    } else if (prev.clockwise) {
+      joinA = {
+        point: prevCurrentTangents.outer.clockwise[0],
+        idealPoint: prevCurrentTangents.inner.clockwise[0]
+      };
+    } else {
+      joinA = {
+        point: prevCurrentTangents.outer.anticlockwise[0],
+        idealPoint: prevCurrentTangents.inner.anticlockwise[0]
+      };
     }
 
-    var tangents = circle.tangentPoints(circle1);
-    var pointA = circle.clockwise ? tangents.outer.clockwise[0] : tangents.outer.anticlockwise[0];
-    var pointB = circle1.clockwise ? tangents.outer.clockwise[1] : tangents.outer.anticlockwise[1];
+    // Get joins(s) of current circle
+  
+    // if (next AND current prev/next tangents create a bad loop) {
+
+    //   joins.push({
+    //     point: equidistant point,
+    //     idealPoint: innerTangentCurrentPrev
+    //   })
+
+    // } else {
+
+    if (current.clockwise) {
+      joinB = {
+        point: prevCurrentTangents.outer.clockwise[1],
+        idealPoint: prevCurrentTangents.inner.clockwise[1]
+      };
+    } else {
+      joinB = {
+        point: prevCurrentTangents.outer.anticlockwise[1],
+        idealPoint: prevCurrentTangents.inner.anticlockwise[1]
+      };
+    }
+
+    joins.push([joinA, joinB]);
+
+    if (next) {
+      var currentNextTangents = current.tangentPoints(next);
+
+      joinA = joinB;
+
+      if ( ! next.clockwise) {
+        joinB = {
+          point: currentNextTangents.outer.clockwise[0],
+          idealPoint: currentNextTangents.inner.clockwise[0]
+        };
+      } else {
+        joinB = {
+          point: currentNextTangents.outer.anticlockwise[0],
+          idealPoint: currentNextTangents.inner.anticlockwise[0]
+        };
+      }
+
+      joins.push([joinA, joinB]);
+    }
+
+    return joins;
+  }
+  circleJoinAnchors(joinA, joinB) {
+    var pointA = joinA.point;
+    var pointB = joinB.point;
+    if (pointA.circle == pointB.circle) {
+      throw Error('Points must be on different circles');
+    }
 
     var kink = Math.abs(diffAngles(
-      tangents.outer.anticlockwise[0].angle,
-      tangents.inner.anticlockwise[0].angle
+      joinA.point.angle,
+      joinA.idealPoint.angle
     ));
     if (isNaN(kink)) {
       kink = 100;
     }
     var kinkWeight = rangec(0.9, 1.4, kink);
 
-    var a1s = pointA.toAnchor();
-    var a2s = pointB.toAnchor();
+    var circleA = pointA.circle;
+    var circleB = pointB.circle;
 
-    var dist = a1s.position.distanceTo(a2s.position);
-    var r0 = circle.radius / (circle.radius + circle1.radius);
-    var r1 = circle1.radius / (circle.radius + circle1.radius);
+    var anchorA = pointA.toAnchor();
+    var anchorB = pointB.toAnchor();
 
-    var invertA = ! circle.clockwise ? 1 : -1;
-    var invertB = ! circle1.clockwise ? -1 : 1;
+    var dist = anchorA.position.distanceTo(anchorB.position);
+    var r0 = circleA.radius / (circleA.radius + circleB.radius);
+    var r1 = circleB.radius / (circleA.radius + circleB.radius);
+
+    var invertA = ! circleA.clockwise ? 1 : -1;
+    var invertB = ! circleB.clockwise ? -1 : 1;
 
     var r0far  = r0 * dist * invertA * .5;
     var r1far  = r1 * dist * invertB * .5;
@@ -334,51 +433,41 @@ class CircleCurve {
     
     r0 = lerp(r0far, r0near, kinkWeight);
     r1 = lerp(r1far, r1near, kinkWeight);
-    a1s.handle.multiplyScalar(r0);
-    a2s.handle.multiplyScalar(r1);
 
-    // debugAnchors(a1s, a2s, false, this.circles.indexOf(circle) / this.circles.length);
+    anchorA.handle.multiplyScalar(r0);
+    anchorB.handle.multiplyScalar(r1);
 
-    var curve = new THREE.CurvePath();
-    curve.add(this.createCurveFromAnchors(a1s, a2s));
+    // debugAnchors(anchorA, anchorB, false, this.circles.indexOf(circleA) / this.circles.length);
 
-    if ( ! circle2) {
-      return curve;
-    }
-
-    tangents = circle1.tangentPoints(circle2);
-    var pointC = circle1.clockwise ? tangents.outer.clockwise[0] : tangents.outer.anticlockwise[0];
-    var arcCurves = this.createCurvesFromPoints(pointB, pointC);
-    arcCurves.forEach(function(arcCurve) {
-      curve.add(arcCurve);
-    });
-    return curve;
+    return [anchorA, anchorB];
   }
-  createCurvesFromPoints(pointA, pointB) {
+  arcJoinAnchors(joinA, joinB) {
+    var pointA = joinA.point;
+    var pointB = joinB.point;
     if (pointA.circle !== pointB.circle) {
       throw Error('Points must be on the same circle');
     }
     var circle = pointA.circle;
     var arcPoints = circle.arcPoints(pointA, pointB);
-    var curves = [];
+    var anchors = [];
     arcPoints.forEach(function(arcPoint1, k) {
       var arcPoint2 = arcPoints[k + 1];
       if ( ! arcPoint2) {
         return;
       }
       var size = Math.abs(arcPoint1.angle - arcPoint2.angle) * circle.radius / 3;
-      var apa1 = arcPoint1.toAnchor();
-      var apa2 = arcPoint2.toAnchor();
-      apa1.handle.multiplyScalar(size);
-      apa2.handle.multiplyScalar(size);
+      var anchorA = arcPoint1.toAnchor();
+      var anchorB = arcPoint2.toAnchor();
+      anchorA.handle.multiplyScalar(size);
+      anchorB.handle.multiplyScalar(size);
       if (circle.clockwise) {
-        apa1.invert();
+        anchorA.invert();
       } else {
-        apa2.invert();
+        anchorB.invert();
       }
-      curves.push(this.createCurveFromAnchors(apa1, apa2));
+      anchors.push([anchorA, anchorB]);
     }.bind(this));
-    return curves;
+    return anchors;
   }
   createCurveFromAnchors(anchorA, anchorB) {
     return new THREE.CubicBezierCurve(

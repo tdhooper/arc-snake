@@ -134,3 +134,8 @@ spacedPointsBetween(curve, start, end, divisions)
         u = uStart + uLength * (i / divisions)
         points.push(curve.getPointAt(u))
     return points
+
+
+
+if outer directional angle > 180 and inner directional angle < 180
+    use equidistant point  
