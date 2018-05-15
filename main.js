@@ -284,6 +284,7 @@ class CircleCurve {
     return i;
   }
   curvesForCircles() {
+    // console.log('ddd');
     var curves = [];
     var prevPrev, prev, current, next;
     for (var i = 0; i < this.circles.length; i++) {
@@ -321,9 +322,8 @@ class CircleCurve {
     return anchors;
   }
   findJoins(prevPrev, prev, current, next) {
-
     var joins = [];
-    var joinA, joinB;
+    var joinA, joinB, joinC;
 
     // join
     //   CirclePoint point
@@ -331,7 +331,7 @@ class CircleCurve {
 
     // create beziers between every pair of joins
 
-    // get last join of previous circle
+    // Last join of previous circle
 
     var prevCurrentTangents = prev.tangentPoints(current);
 
@@ -340,60 +340,119 @@ class CircleCurve {
       joinA = prevJoins[prevJoins.length - 1][1];
     } else if (prev.clockwise) {
       joinA = {
-        point: prevCurrentTangents.outer.clockwise[0],
-        idealPoint: prevCurrentTangents.inner.clockwise[0]
+        point: prevCurrentTangents.outer.clockwise[0]
       };
     } else {
       joinA = {
-        point: prevCurrentTangents.outer.anticlockwise[0],
-        idealPoint: prevCurrentTangents.inner.anticlockwise[0]
+        point: prevCurrentTangents.outer.anticlockwise[0]
       };
     }
 
-    // Get joins(s) of current circle
-  
-    // if (next AND current prev/next tangents create a bad loop) {
+    if (prev.clockwise) {
+      if (current.clockwise) {
+        joinA.idealPoint = prevCurrentTangents.outer.clockwise[0];
+      } else {
+        joinA.idealPoint = prevCurrentTangents.inner.clockwise[0];
+      }
+    } else {
+      if (current.clockwise) {
+        joinA.idealPoint = prevCurrentTangents.inner.anticlockwise[0];
+      } else {
+        joinA.idealPoint = prevCurrentTangents.outer.anticlockwise[0];
+      }
+    }
 
-    //   joins.push({
-    //     point: equidistant point,
-    //     idealPoint: innerTangentCurrentPrev
-    //   })
+    // debugCircle(joinA.idealPoint.toAnchor().position, .04, .1);
 
-    // } else {
+
+    // Current circle
 
     if (current.clockwise) {
       joinB = {
         point: prevCurrentTangents.outer.clockwise[1],
-        idealPoint: prevCurrentTangents.inner.clockwise[1]
       };
+      if (prev.clockwise) {
+        joinB.idealPoint = prevCurrentTangents.outer.clockwise[1];
+      } else {
+        joinB.idealPoint = prevCurrentTangents.inner.anticlockwise[1];
+      }
     } else {
       joinB = {
         point: prevCurrentTangents.outer.anticlockwise[1],
-        idealPoint: prevCurrentTangents.inner.anticlockwise[1]
       };
+      if (prev.clockwise) {
+        joinB.idealPoint = prevCurrentTangents.inner.clockwise[1];
+      } else {
+        joinB.idealPoint = prevCurrentTangents.outer.anticlockwise[1];
+      }
     }
 
-    joins.push([joinA, joinB]);
+    if ( ! next) {
+      joins.push([joinA, joinB]);
+      return joins;
+    }
 
-    if (next) {
-      var currentNextTangents = current.tangentPoints(next);
+    var currentNextTangents = current.tangentPoints(next);
 
-      joinA = joinB;
-
-      if ( ! next.clockwise) {
-        joinB = {
+    if (next.clockwise) {
+      if (current.clockwise) {
+        joinC = {
           point: currentNextTangents.outer.clockwise[0],
-          idealPoint: currentNextTangents.inner.clockwise[0]
+          idealPoint: currentNextTangents.outer.clockwise[0]
         };
       } else {
-        joinB = {
+        joinC = {
           point: currentNextTangents.outer.anticlockwise[0],
           idealPoint: currentNextTangents.inner.anticlockwise[0]
         };
       }
-
-      joins.push([joinA, joinB]);
+    } else {
+      if (current.clockwise) {
+        joinC = {
+          point: currentNextTangents.outer.clockwise[0],
+          idealPoint: currentNextTangents.inner.clockwise[0]
+        };
+      } else {
+        joinC = {
+          point: currentNextTangents.outer.anticlockwise[0],
+          idealPoint: currentNextTangents.outer.anticlockwise[0]
+        };
+      }
     }
+
+    var pointDiff = diffAnglesDirection(
+      joinB.point.angle,
+      joinC.point.angle,
+      current.clockwise
+    );
+    var idealPointDiff = diffAnglesDirection(
+      joinB.idealPoint.angle,
+      joinC.idealPoint.angle,
+      current.clockwise
+    );
+
+    // debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
+    // debugCircle(joinC.idealPoint.toAnchor().position, .04, .1);
+    // debugCircle(joinC.idealPoint.toAnchor().position, .04, .7);
+
+
+    console.log(current.clockwise, joinB.point.angle, joinC.point.angle, pointDiff);
+    console.log(current.clockwise, joinB.idealPoint.angle, joinC.idealPoint.angle, idealPointDiff);
+    if (Math.abs(pointDiff) > Math.PI && Math.abs(idealPointDiff) < Math.PI) {
+      // debugCircle(joinB.point.toAnchor().position, .04, .1);
+      // debugCircle(joinC.point.toAnchor().position, .04, .3);
+
+      joinB.point.angle = mod(joinB.point.angle + (Math.PI * 2 - Math.abs(pointDiff)) / 2, Math.PI * 2);
+      joins.push([joinA, joinB]);
+
+      debugCircle(joinB.point.toAnchor().position, .04, .8);
+      debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
+      return joins;
+    }
+
+
+    joins.push([joinA, joinB]);
+    joins.push([joinB, joinC]);
 
     return joins;
   }
@@ -408,10 +467,17 @@ class CircleCurve {
       joinA.point.angle,
       joinA.idealPoint.angle
     ));
+    // console.log(joinA, joinB);
+    // console.log(kink);
+
+    // debugCircle(joinA.point.toAnchor().position, .04, .1);
+    // debugCircle(joinA.idealPoint.toAnchor().position, .04, .7);
+
     if (isNaN(kink)) {
       kink = 100;
     }
-    var kinkWeight = rangec(0.9, 1.4, kink);
+    var kinkWeight = rangec(0.1, 1.4, kink);
+    // console.log('weight', kinkWeight)
 
     var circleA = pointA.circle;
     var circleB = pointB.circle;
@@ -481,29 +547,41 @@ class CircleCurve {
 
 var seed = Math.random();
 console.log(seed);
-Math.seedrandom(0.5490353568839184);
+Math.seedrandom(seed);
 
-var snakeLength = 1;
+var snakeLength = 10;
 var snakeHead = snakeLength;
 
 var circleCurve = new CircleCurve();
-while ((circleCurve.curve().getLength() || 0) < snakeLength) {
-  circleCurve.circles.push(
-    randomCircle(
-      circleCurve.circles[circleCurve.circles.length - 1]
-    )
-  );
-}
 
-var specs = [
-  -1, .03,
-  .1, .04,
-  .1, .08,
-  .1, .09,
-  .4, .1,
-  .4, .15
-];
+// while ((circleCurve.curve().getLength() || 0) < snakeLength) {
+//   circleCurve.circles.push(
+//     randomCircle(
+//       circleCurve.circles[circleCurve.circles.length - 1]
+//     )
+//   );
+// }
 
+// var specs = [
+//   -1, .03,
+//   .1, .04,
+//   .1, .08,
+//   .1, .09,
+//   .4, .1,
+//   .4, .15
+// ];
+
+// var specs = [
+//   -1, .2,
+//   .4, .3,
+//   .4, .6,
+// ];
+
+// var specs = [
+//   -1, .2,
+//   .4, .3,
+//   .4, .6,
+// ];
 
 // specs = [];
 // var numSpecs = 4;
@@ -525,23 +603,43 @@ var specs = [
 // }
 
 
-circleCurve.circles = [];
-var pos = 0;
-specs.forEach(function(size, i) {
-  if (i % 2 == 0) {
-    pos += size;
-  } else {
-    pos += size;
-    circleCurve.circles.push(
-      new Circle(
-        new THREE.Vector2(pos, 0),
-        size,
-        Math.floor(i / 2) % 2 == 0
-      )
-    );
-    pos += size;
-  }
+// circleCurve.circles = [];
+// var pos = 0;
+// specs.forEach(function(size, i) {
+//   if (i % 2 == 0) {
+//     pos += size;
+//   } else {
+//     pos += size;
+//     circleCurve.circles.push(
+//       new Circle(
+//         new THREE.Vector2(pos, 0),
+//         size,
+//         Math.floor(i / 2) % 2 == 0
+//       )
+//     );
+//     pos += size;
+//   }
+// });
+
+// circleCurve.circles = [];
+var specs = [
+  [-.3, -.4, .4, false],
+  [.7, -.5, .15, true],
+  [.0, .5, .1, false],
+  [-.4, .15, .4, true],
+  [-.8, -.2, .1, false],
+  [-1.2, -.6, .2, false],
+]
+specs.forEach(function(spec, i) {
+  circleCurve.circles.push(
+    new Circle(
+      new THREE.Vector2(spec[0], spec[1]),
+      spec[2],
+      spec[3]
+    )
+  );
 });
+
 
 snakeLength = circleCurve.curve().getLength();
 snakeHead = snakeLength;
@@ -713,6 +811,17 @@ function debugAnchors(anchorA, anchorB, clockwise, colIndex) {
 function diffAngles(a, b) {
   return mod(a - b + Math.PI, Math.PI * 2) - Math.PI;
 }
+
+function diffAnglesDirection(a, b, clockwise) {
+  if ( ! clockwise && a < b) {
+    a += Math.PI * 2;
+  }
+  if (clockwise && b < a) {
+    b += Math.PI * 2;
+  }
+  return b - a;
+}
+
 
 function mod(a, n) {
   return a - Math.floor(a / n) * n;
