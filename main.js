@@ -436,25 +436,11 @@ class CircleCurve {
       current.clockwise
     );
 
-    // debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
-    // debugCircle(joinC.idealPoint.toAnchor().position, .04, .1);
-    // debugCircle(joinC.idealPoint.toAnchor().position, .04, .7);
-
-
-    // console.log(current.clockwise, joinB.point.angle, joinC.point.angle, pointDiff);
-    // console.log(current.clockwise, joinB.idealPoint.angle, joinC.idealPoint.angle, idealPointDiff);
     if (Math.abs(pointDiff) > Math.PI && Math.abs(idealPointDiff) < Math.PI) {
-      // debugCircle(joinB.point.toAnchor().position, .04, .1);
-      // debugCircle(joinC.point.toAnchor().position, .04, .3);
-
       joinB.point.angle = mod(joinB.point.angle + (Math.PI * 2 - Math.abs(pointDiff)) / 2, Math.PI * 2);
       joins.push([joinA, joinB]);
-
-      // debugCircle(joinB.point.toAnchor().position, .04, .8);
-      // debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
       return joins;
     }
-
 
     joins.push([joinA, joinB]);
     joins.push([joinB, joinC]);
@@ -576,6 +562,11 @@ var circleCurve = new CircleCurve();
 //   );
 // }
 
+// snakeLength /= 5;
+// snakeHead = snakeLength;
+
+
+
 // var specs = [
 //   -1, .03,
 //   .1, .04,
@@ -657,6 +648,7 @@ specs.forEach(function(spec, i) {
 
 snakeLength = circleCurve.curve().getLength();
 snakeHead = snakeLength;
+snakeLength *= .8;
 
 
 var delta = 0;
@@ -673,13 +665,11 @@ function tickDraw(context) {
   lastTime = context.time;
 
   snakeHead += delta * 2;
-  // snakeHead *= 1.2;
 
   // Add circles until we have enough curve to move into
   while (
     circleCurve.circleForCurvePosition(snakeHead) > circleCurve.circles.length - 3
   ) {
-    // console.log('add');
     circleCurve.circles.push(
       randomCircle(
         circleCurve.circles[circleCurve.circles.length - 1]
@@ -687,19 +677,13 @@ function tickDraw(context) {
     );
   }
 
-  // // Remove unused circles
+  // Remove unused circles
   var snakeTail = snakeHead - snakeLength;
   var removeIndex = circleCurve.circleForCurvePosition(snakeTail);
   removeIndex = Math.max(removeIndex - 1, 0);
-  // console.log('remove', removeIndex);
-  // console.log('circles', circleCurve.circles.length);
-  // console.log('removeIndex', removeIndex);
   var before = circleCurve.curve().getLength();
-  // console.log('curve length before', after);
   circleCurve.circles = circleCurve.circles.slice(removeIndex);
   var after = circleCurve.curve().getLength();
-  // console.log('circles now', after);
-  // console.log('head move', before - after);
   snakeHead -= before - after;
   snakeTail = snakeHead - snakeLength;
 
@@ -708,40 +692,8 @@ function tickDraw(context) {
     depth: 1
   });
 
-  // circles[0].center = new THREE.Vector2(
-  //   Math.sin(context.time),
-  //   Math.cos(context.time)
-  // );
-
-// for circle in circles
-//   nextCircle = circles[i + 1]
-//   anchorA, anchorB = tangent(circle, nextCircle)
-//   if ! lastAnchor
-//     lastAnchor = Anchor startPoint -anchorA.handle
-//   bezier lastAnchor anchorA
-//   bezier anchorA anchorB
-//   lastAnchor anchorB
-
-  /*
-  var desiredLen = 5;
-  var len = curve.getLength();
-  var curvePoints = [];
-  var divisions = texturePoints - 1;
-  for ( var d = 0; d <= divisions; d ++ ) {
-    curvePoints.push( curve.getPointAt( (d / divisions) * (desiredLen / len) ) );
-  }
-  */
-
   var curve = circleCurve.curve();
-  // console.log('curve length', curve.getLength());
-  // console.log('head', snakeHead);
-  // console.log('tail', snakeTail);
   var curvePoints = spacedPointsBetween(curve, snakeHead, snakeTail, texturePoints);
-  // var curvesForCircles = circleCurve.curvesForCircles();
-  // curvePoints = curvesForCircles[0].getSpacedPoints(texturePoints - 1);
-  // curvePoints = curvesForCircles[curvesForCircles.length - 1].getSpacedPoints(texturePoints - 1);
-  // curvePoints = curve.getSpacedPoints(texturePoints - 1);
-  // var curvePoints = curve.getSpacedPoints(texturePoints - 1);
   var curvePointsFormatted = curvePoints.reduce(function(acc, v) {
     return acc.concat((v.x * .5 + .5) * 255, (v.y * .5 + .5) * 255);
   }, []);
@@ -757,16 +709,12 @@ function tickDraw(context) {
     debugCircle(circle.center, circle.radius, colIndex);
   });
 
-  drawOverlay(regl({
-    attributes: {
-      position: debugPositions
-    },
-    count: debugPositions.length
-  }));
-
-//   if (context.time > .1) {
-//   debugger;
-// } 
+  // drawOverlay(regl({
+  //   attributes: {
+  //     position: debugPositions
+  //   },
+  //   count: debugPositions.length
+  // }));
 }
 
 function debugCircle(center, radius, colIndex) {
