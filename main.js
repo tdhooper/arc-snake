@@ -441,8 +441,8 @@ class CircleCurve {
     // debugCircle(joinC.idealPoint.toAnchor().position, .04, .7);
 
 
-    console.log(current.clockwise, joinB.point.angle, joinC.point.angle, pointDiff);
-    console.log(current.clockwise, joinB.idealPoint.angle, joinC.idealPoint.angle, idealPointDiff);
+    // console.log(current.clockwise, joinB.point.angle, joinC.point.angle, pointDiff);
+    // console.log(current.clockwise, joinB.idealPoint.angle, joinC.idealPoint.angle, idealPointDiff);
     if (Math.abs(pointDiff) > Math.PI && Math.abs(idealPointDiff) < Math.PI) {
       // debugCircle(joinB.point.toAnchor().position, .04, .1);
       // debugCircle(joinC.point.toAnchor().position, .04, .3);
@@ -450,8 +450,8 @@ class CircleCurve {
       joinB.point.angle = mod(joinB.point.angle + (Math.PI * 2 - Math.abs(pointDiff)) / 2, Math.PI * 2);
       joins.push([joinA, joinB]);
 
-      debugCircle(joinB.point.toAnchor().position, .04, .8);
-      debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
+      // debugCircle(joinB.point.toAnchor().position, .04, .8);
+      // debugCircle(joinB.idealPoint.toAnchor().position, .04, .1);
       return joins;
     }
 
@@ -461,6 +461,17 @@ class CircleCurve {
 
     return joins;
   }
+  calcKink(join) {
+    var kink = Math.abs(diffAngles(
+      join.point.angle,
+      join.idealPoint.angle
+    ));
+    if (isNaN(kink)) {
+      kink = 100;
+    }
+    return kink;
+    return rangec(0.1, 2., kink);
+  }
   circleJoinAnchors(joinA, joinB) {
     var pointA = joinA.point;
     var pointB = joinB.point;
@@ -468,21 +479,8 @@ class CircleCurve {
       throw Error('Points must be on different circles');
     }
 
-    var kink = Math.abs(diffAngles(
-      joinA.point.angle,
-      joinA.idealPoint.angle
-    ));
-    // console.log(joinA, joinB);
-    // console.log(kink);
-
-    // debugCircle(joinA.point.toAnchor().position, .04, .1);
-    // debugCircle(joinA.idealPoint.toAnchor().position, .04, .7);
-
-    if (isNaN(kink)) {
-      kink = 100;
-    }
-    var kinkWeight = rangec(0.1, 1.4, kink);
-    // console.log('weight', kinkWeight)
+    var kinkWeightA = this.calcKink(joinA);
+    var kinkWeightB = this.calcKink(joinB);
 
     var circleA = pointA.circle;
     var circleB = pointB.circle;
@@ -499,18 +497,27 @@ class CircleCurve {
 
     var r0far  = r0 * dist * invertA * .5;
     var r1far  = r1 * dist * invertB * .5;
-    var r0near  = dist * invertA * .5;
-    var r1near  = dist * invertB * .5;
+    var r0near  = dist * invertA * .25;
+    var r1near  = dist * invertB * .25;
     
-    r0 = lerp(r0far, r0near, kinkWeight);
-    r1 = lerp(r1far, r1near, kinkWeight);
+    r0 = lerp(r0far, r0near, 0);
+    r1 = lerp(r1far, r1near, 0);
+
+    var min = 0;
+    var variant = .1;
+    var kinkAmt = .2;
+    var radiusAmt = 2.;
+    var distAmt = .5;
+
+    r0 = invertA * (min + variant * ((1 + kinkWeightA * kinkAmt) * (1 + circleA.radius * radiusAmt) * (1 + dist * distAmt)));
+    r1 = invertB * (min + variant * ((1 + kinkWeightB * kinkAmt) * (1 + circleB.radius * radiusAmt) * (1 + dist * distAmt)));
 
     anchorA.handle.multiplyScalar(r0);
     anchorB.handle.multiplyScalar(r1);
 
     // debugAnchors(anchorA, anchorB, false, this.circles.indexOf(circleA) / this.circles.length);
-    debugAnchor(anchorA);
-    debugAnchor(anchorB);
+    // debugAnchor(anchorA);
+    // debugAnchor(anchorB);
 
     return [anchorA, anchorB];
   }
