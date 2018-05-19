@@ -111,7 +111,12 @@ var drawOverlay = regl({
       mat = vec2(1, viewWidth / viewHeight);
     }
     colIndex = position.z;
-    gl_Position = vec4(position.xy * mat, 0, 1);
+    float order = 0.;
+    if (position.z == 2.) {
+      colIndex = .45;
+      order = -1.;
+    }
+    gl_Position = vec4(position.xy * mat, order, 1);
   }`,
 
   uniforms: {
@@ -504,6 +509,8 @@ class CircleCurve {
     anchorB.handle.multiplyScalar(r1);
 
     // debugAnchors(anchorA, anchorB, false, this.circles.indexOf(circleA) / this.circles.length);
+    debugAnchor(anchorA);
+    debugAnchor(anchorB);
 
     return [anchorA, anchorB];
   }
@@ -767,6 +774,41 @@ function debugCircle(center, radius, colIndex) {
     ]);
   }
 }
+
+function debugLine(from, to, weight) {
+  var angle = from.clone().sub(to).angle();
+  var width = from.distanceTo(to) + weight;
+  var height = weight;
+  var position = from.clone().lerp(to, .5);
+  debugSquare(position, width, height, angle);
+}
+
+function debugSquare(position, sizeX, sizeY, angle) {
+    var geometry = new THREE.Geometry();
+    geometry.vertices.push(
+      new THREE.Vector3(-sizeX / 2, -sizeY / 2, 0),
+      new THREE.Vector3(sizeX / 2, -sizeY / 2, 0),
+      new THREE.Vector3(sizeX / 2, sizeY / 2, 0),
+      new THREE.Vector3(sizeX / 2, sizeY / 2, 0),
+      new THREE.Vector3(-sizeX / 2, sizeY / 2, 0),
+      new THREE.Vector3(-sizeX / 2, -sizeY / 2, 0)
+    );
+    geometry.rotateZ(angle);
+    geometry.translate(position.x, position.y);
+    geometry.vertices.forEach(function(v) {
+      debugPositions.push([v.x, v.y, 2]);
+    });
+}
+
+function debugAnchor(anchor) {
+  var angle = anchor.handle.angle();
+  var handlePosition = anchor.position.clone().add(anchor.handle);
+  // debugSquare(anchor.position, .05, .05, angle);
+  debugLine(anchor.position, handlePosition, .01);
+  angle += Math.PI / 4;
+  debugSquare(handlePosition, .03, .03, angle);
+}
+
 
 function debugAnchors(anchorA, anchorB, clockwise, colIndex) {
   var width = .1;
