@@ -662,18 +662,24 @@ snakeHead = snakeLength;
 var delta = 0;
 var lastTime = 0;
 
-// var tick = regl.frame(tickDraw);
+var tick = regl.frame(tickDraw);
 
-tickDraw({time: 0});
+// tickDraw({time: 0});
 
-function tickDraw(context) {  
+function tickDraw(context) {
+  debugPositions = [];
+
   delta = context.time - lastTime;
   lastTime = context.time;
 
-  snakeHead += delta * 6;
+  snakeHead += delta * 2;
+  // snakeHead *= 1.2;
 
   // Add circles until we have enough curve to move into
-  while (snakeHead > circleCurve.curve().getLength()) {
+  while (
+    circleCurve.circleForCurvePosition(snakeHead) > circleCurve.circles.length - 3
+  ) {
+    // console.log('add');
     circleCurve.circles.push(
       randomCircle(
         circleCurve.circles[circleCurve.circles.length - 1]
@@ -684,6 +690,8 @@ function tickDraw(context) {
   // // Remove unused circles
   var snakeTail = snakeHead - snakeLength;
   var removeIndex = circleCurve.circleForCurvePosition(snakeTail);
+  removeIndex = Math.max(removeIndex - 1, 0);
+  // console.log('remove', removeIndex);
   // console.log('circles', circleCurve.circles.length);
   // console.log('removeIndex', removeIndex);
   var before = circleCurve.curve().getLength();
@@ -691,6 +699,7 @@ function tickDraw(context) {
   circleCurve.circles = circleCurve.circles.slice(removeIndex);
   var after = circleCurve.curve().getLength();
   // console.log('circles now', after);
+  // console.log('head move', before - after);
   snakeHead -= before - after;
   snakeTail = snakeHead - snakeLength;
 
@@ -895,8 +904,8 @@ function lerp(v0, v1, t) {
 function randomCircle(lastCircle) {
   var circle = new Circle(
     new THREE.Vector2(
-      Math.random() * 2 - 1,
-      Math.random() * 2 - 1
+      (Math.random() * 2 - 1) * .75,
+      (Math.random() * 2 - 1) * .75
     ),
     Math.random() * 0.4 + 0.1,
     Math.random() > 0.5
